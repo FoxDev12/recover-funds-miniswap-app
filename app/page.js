@@ -1,11 +1,18 @@
+// Messy af code
+
+
 'use client'
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
+import { ethers } from 'ethers';
 
 export default function Home() {
   const [inputValue1, setInputValue1] = useState('');
   const [inputValue2, setInputValue2] = useState('');
   const [buttonText, setButtonText] = useState('Withdraw liquidity');
+  const [TRbuttonText, setTRbuttonText] = useState('Connect to metamask');
+  const [provider, setProvider] = useState();
+  const [accounts, setAccounts] = useState([]);
 
   const handleButtonClick = () => {
     // Do something when the button below the textboxes is clicked
@@ -16,10 +23,33 @@ export default function Home() {
   const getButtonText = () => {
     return buttonText;
   }
-  const handleTopRightButtonClick = () => {
+  const getTRButtonText = () => {
+    return TRbuttonText;
+  }
+  const handleTopRightButtonClick = async() => {
     // Do something when the button on the top right is clicked
-    console.log('Top right button clicked!');
+    try {
+      setProvider(new ethers.BrowserProvider(window.ethereum));
+      setAccounts(await window.ethereum.request({ method: 'eth_requestAccounts' }));
+    }
+    catch(error) {
+      console.log(error);
+    }
   };
+  useEffect(() => {
+    console.log(accounts);
+    if(accounts[0] === undefined) {
+      setTRbuttonText("Connect to metamask")
+    } else {
+    setTRbuttonText("Connected " + accounts[0]);
+    }
+  }, [accounts]);
+  useEffect(() => {
+    if(window.ethereum === undefined) {
+      console.log("install Metamask")
+      setTRbuttonText("ERROR: Install Metamask")
+    }
+  });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100vh', justifyContent: 'center' }}>
@@ -29,9 +59,23 @@ export default function Home() {
 
       <button 
         onClick={handleTopRightButtonClick} 
-        style={{ position: 'absolute', top: '10px', right: '10px' }}
+        style={{
+          position: 'absolute', 
+          top: '10px', 
+          right: '10px',
+          padding: '10px 20px',
+          border: '1px solid black',
+          backgroundColor: 'lightgray',
+          cursor: 'pointer',
+          borderRadius: '10px',
+          maxWidth: '250px',      // Set the maximum width
+          maxHeight: '50px',     // Set the maximum height
+          overflow: 'hidden',    // Hide any excess content
+          textOverflow: 'ellipsis', // Display ellipsis if the content is too long
+          whiteSpace: 'nowrap'   // Prevent text from wrapping to the next line
+        }}
       >
-        Top Right Button
+        {getTRButtonText()}
       </button>
       <h2 style={{ marginBottom: '20px' }}>Enter token addresses</h2> {/* <-- This is the title */}
       <div style={{ marginBottom: '10px' }}>
