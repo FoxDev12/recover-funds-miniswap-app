@@ -19,17 +19,32 @@ export default function Home() {
   const [factoryContract, setFactoryContract] = useState();
   const [routerContract, setRouterContract] = useState();
   const [approval, setApproval] = useState(0);
-  const handleButtonClick = () => {
-
+  const [balance, setBalance] = useState(0);
+  const [signer, setSigner] = useState();
+  const handleButtonClick = async() => {
+    if(routerContract === undefined || pairContract === undefined) {
+      return;
+    }
+    if(approval === 0) {
+      await pairContract.approve('0x73F7790344815a0e100eb12DBFd55F0D9dF6D171', ethers.MaxUint256);
+      setApproval(1);
+    }
+    if(approval === 1) {
+      await routerContract.removeLiquidity(inputValue1, inputValue2, balance, 0, 0, accounts[0], Date.now() + 100000);
+      setApproval(0);
+    }
   };
 
 
   useEffect(() => {
-    setRouterContract(new ethers.Contract('0x73F7790344815a0e100eb12DBFd55F0D9dF6D171', RouterABI, provider));
+    if (provider === undefined) {
+      return;
+    }
+    setRouterContract(new ethers.Contract('0x73F7790344815a0e100eb12DBFd55F0D9dF6D171', RouterABI, signer));
   }, [provider]);
 
   useEffect(() => {
-    if(routerContract === undefined) {
+    if(routerContract === undefined || provider === undefined) {
       return;
     }
 
@@ -39,19 +54,24 @@ export default function Home() {
     console.log(routerContract);
     let factoryAddress = await routerContract.factory();
     console.log("factory", factoryAddress);
-    setFactoryContract(new ethers.Contract(factoryAddress, FactoryABI, provider));
+    setFactoryContract(new ethers.Contract(factoryAddress, FactoryABI, signer));
   }
   reactIsGreat();
 }, [routerContract, accounts]);
 
   useEffect(() => {
-    if(factoryContract === undefined || inputValue1 === '' || inputValue2 === '') {
+    if(factoryContract === undefined || inputValue1 === '' || inputValue2 === '' || provider === undefined) {
       return;
     }
     async function reactIsReallyGreat() {
+      console.log(provider);
       let pairAddress = await factoryContract.getPair(inputValue1, inputValue2);
       console.log("pair", pairAddress);
-      setPairContract(new ethers.Contract(pairAddress, ERC20ABI, provider));
+      try {
+      setPairContract(new ethers.Contract(pairAddress, ERC20ABI, signer));
+      } catch(error) {
+        console.log(error);
+      }
     }
     reactIsReallyGreat();
   }, [factoryContract, inputValue1, inputValue2]);
@@ -62,15 +82,18 @@ export default function Home() {
     }
 
     async function reactIsReallyReallyGreat() {
-      let appr = await pairContract.allowance(accounts[0], routerContract.address);
-      if(appr > await pairContract.balanceOf(accounts[0])) {
+      let appr = await pairContract.allowance(accounts[0], '0x73F7790344815a0e100eb12DBFd55F0D9dF6D171');
+      let bal = await pairContract.balanceOf(accounts[0]);
+      if(appr >= balance) {
         setApproval(1);
       } else {
         setApproval(0);
       }
+      setBalance(bal);
     }
     reactIsReallyReallyGreat();
-  }, [pairContract]);
+  }, [pairContract, buttonText]);
+
   useEffect(() => {
     if(approval === 1) {
       setButtonText("Withdraw liquidity");
@@ -91,6 +114,9 @@ export default function Home() {
   const handleTopRightButtonClick = async() => {
     try {
       const lprovider = new ethers.BrowserProvider(window.ethereum);
+      const lsigner = await lprovider.getSigner();
+      console.log(lsigner);
+      setSigner(lsigner);
       const laccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
       setProvider(lprovider);
       setAccounts(laccounts);
