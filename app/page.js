@@ -5,7 +5,9 @@
 import React, { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { ethers } from 'ethers';
-
+import ERC20ABI from '../ABIs/ERC20Abi.json';
+import RouterABI from '../ABIs/RouterAbi.json';
+import FactoryABI from '../ABIs/FactoryAbi.json';
 export default function Home() {
   const [inputValue1, setInputValue1] = useState('');
   const [inputValue2, setInputValue2] = useState('');
@@ -13,26 +15,101 @@ export default function Home() {
   const [TRbuttonText, setTRbuttonText] = useState('Connect to metamask');
   const [provider, setProvider] = useState();
   const [accounts, setAccounts] = useState([]);
-
+  const [pairContract, setPairContract] = useState();
+  const [factoryContract, setFactoryContract] = useState();
+  const [routerContract, setRouterContract] = useState();
+  const [approval, setApproval] = useState(0);
   const handleButtonClick = () => {
-    // Do something when the button below the textboxes is clicked
-    console.log('Button below the textboxes clicked!');
-    console.log('First Input:', inputValue1);
-    console.log('Second Input:', inputValue2);
+
   };
+
+
+  useEffect(() => {
+    setRouterContract(new ethers.Contract('0x73F7790344815a0e100eb12DBFd55F0D9dF6D171', RouterABI, provider));
+  }, [provider]);
+
+  useEffect(() => {
+    if(routerContract === undefined) {
+      return;
+    }
+
+    // You can't make a useEffect async. Instead, declare an async function inside your effect and then call it.
+    // All of the above makes perfect sense ofc
+    async function reactIsGreat() {
+    console.log(routerContract);
+    let factoryAddress = await routerContract.factory();
+    console.log("factory", factoryAddress);
+    setFactoryContract(new ethers.Contract(factoryAddress, FactoryABI, provider));
+  }
+  reactIsGreat();
+}, [routerContract, accounts]);
+
+  useEffect(() => {
+    if(factoryContract === undefined || inputValue1 === '' || inputValue2 === '') {
+      return;
+    }
+    async function reactIsReallyGreat() {
+      let pairAddress = await factoryContract.getPair(inputValue1, inputValue2);
+      console.log("pair", pairAddress);
+      setPairContract(new ethers.Contract(pairAddress, ERC20ABI, provider));
+    }
+    reactIsReallyGreat();
+  }, [factoryContract, inputValue1, inputValue2]);
+
+  useEffect(() => {
+    if(pairContract === undefined) {
+      return;
+    }
+
+    async function reactIsReallyReallyGreat() {
+      let appr = await pairContract.allowance(accounts[0], routerContract.address);
+      if(appr > await pairContract.balanceOf(accounts[0])) {
+        setApproval(1);
+      } else {
+        setApproval(0);
+      }
+    }
+    reactIsReallyReallyGreat();
+  }, [pairContract]);
+  useEffect(() => {
+    if(approval === 1) {
+      setButtonText("Withdraw liquidity");
+    }
+    else {
+      setButtonText("Approve");
+    }
+  }, [approval]);
   const getButtonText = () => {
     return buttonText;
   }
   const getTRButtonText = () => {
     return TRbuttonText;
   }
+
+
+  // Handles MM connect
   const handleTopRightButtonClick = async() => {
-    // Do something when the button on the top right is clicked
     try {
-      setProvider(new ethers.BrowserProvider(window.ethereum));
-      setAccounts(await window.ethereum.request({ method: 'eth_requestAccounts' }));
-    }
-    catch(error) {
+      const lprovider = new ethers.BrowserProvider(window.ethereum);
+      const laccounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      setProvider(lprovider);
+      setAccounts(laccounts);
+      const network = await lprovider.getNetwork();
+      if (network.chainId != 1) {
+            try {
+                await window.ethereum.request({
+                    method: 'wallet_switchEthereumChain',
+                    params: [{ chainId: '0x1' }],
+                });
+            } catch (switchError) {
+                if (switchError.code === 4902) {
+                    alert('Cannot switch to the Ethereum mainnet.');
+                } else {
+                    console.error(switchError);
+                }
+            }
+          }
+      } catch(error) {
       console.log(error);
     }
   };
@@ -44,6 +121,10 @@ export default function Home() {
     setTRbuttonText("Connected " + accounts[0]);
     }
   }, [accounts]);
+
+
+
+
   useEffect(() => {
     if(window.ethereum === undefined) {
       console.log("install Metamask")
@@ -68,16 +149,16 @@ export default function Home() {
           backgroundColor: 'lightgray',
           cursor: 'pointer',
           borderRadius: '10px',
-          maxWidth: '250px',      // Set the maximum width
-          maxHeight: '50px',     // Set the maximum height
-          overflow: 'hidden',    // Hide any excess content
-          textOverflow: 'ellipsis', // Display ellipsis if the content is too long
-          whiteSpace: 'nowrap'   // Prevent text from wrapping to the next line
+          maxWidth: '250px',     
+          maxHeight: '50px',     
+          overflow: 'hidden',    
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
         }}
       >
         {getTRButtonText()}
       </button>
-      <h2 style={{ marginBottom: '20px' }}>Enter token addresses</h2> {/* <-- This is the title */}
+      <h2 style={{ marginBottom: '20px' }}>Enter token addresses</h2> {}
       <div style={{ marginBottom: '10px' }}>
         <input 
           type="text" 
